@@ -1,0 +1,19 @@
+g.item>.base>circle {
+  stroke-width:3;
+  stroke:#aaa;
+  fill:#888;
+}
+g.item:hover>.base>circle {
+  stroke-width:3;
+  stroke:#f00;
+  opacity:0.8;
+}
+
+#items.blink>g.item>.base>circle {
+  animation:blinking 0.8s infinite;
+}
+@keyframes blinking {
+  0%  { fill: inherit; }
+  50% { fill: #0007; }
+  100%{ fill: inherit; }
+}
