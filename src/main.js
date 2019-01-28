@@ -32,7 +32,7 @@ const menu = Menu({
         deleteNode(selectedNode)
         selectedNode = null
       }},
-      { title: 'Disconnect all links (Ctrl+Del)', icon: 'unlink', color: '#a0a', action: function(e) {
+      { title: 'Disconnect all links (Shift+Del)', icon: 'unlink', color: '#a0a', action: function(e) {
         deleteLinksForNode(selectedNode)
       }},
       // TODO
@@ -189,12 +189,15 @@ function tick() {
 function restart() {
   console.log('exec restart')
 
+  container.classed('shadow', (d) => selectedNode || selectedLink)
+
   VIEW.nodes = VIEW.nodes.data(DATA.nodes, (d) => d.id)
 
   // update existing nodes (static & selected visual states)
   VIEW.nodes
     .classed('static', (d) => d.static)
     .classed('selected', (d) => d === selectedNode)
+    .classed('marked', (d) => d.marked)
   VIEW.nodes.selectAll('.bg')
     .style('fill', (d) => (d === selectedNode) ? d3.rgb(colors(d.id)).brighter().toString() : colors(d.id))
   VIEW.nodes.selectAll('.name')
@@ -209,6 +212,7 @@ function restart() {
     .attr('menuType', 'node')
     .classed('node', true)
     .classed('selected', (d) => d === selectedNode)
+    .classed('marked', (d) => d.marked)
     .classed('static', (d) => d.static)
     .on('contextmenu', function() {
       d3.event.preventDefault()
@@ -237,7 +241,8 @@ function restart() {
           .style('marker-end', 'url(#end-arrow)')
           .classed('hidden', false)
           .attr('d', `M${mousedownNode.x},${mousedownNode.y}L${mousedownNode.x},${mousedownNode.y}`)
-      }
+      } else
+        markConnectedNode(selectedNode)
 
       restart()
     })
@@ -301,7 +306,9 @@ function restart() {
   VIEW.links = VIEW.links.data(DATA.links)
 
   // update existing links
-  VIEW.links.classed('selected', (d) => d === selectedLink)
+  VIEW.links
+    .classed('selected', (d) => d === selectedLink)
+    .classed('marked', (d) => d.marked)
     .style('marker-start', (d) => d.left ? 'url(#start-arrow)' : '')
     .style('marker-end', (d) => d.right ? 'url(#end-arrow)' : '')
 
@@ -313,6 +320,7 @@ function restart() {
     .attr('menuType', 'link')
     .attr('class', 'link')
     .classed('selected', (d) => d === selectedLink)
+    .classed('marked', (d) => d.marked)
     .style('marker-start', (d) => d.left ? 'url(#start-arrow)' : '')
     .style('marker-end', (d) => d.right ? 'url(#end-arrow)' : '')
     .on('contextmenu', function() {
@@ -328,6 +336,7 @@ function restart() {
       // select link
       selectedLink = mousedownLink = d
       selectedNode = null
+      markConnectedLink(selectedLink)
       restart()
     })
     .merge(VIEW.links)
@@ -344,6 +353,7 @@ function mousedown() {
   svg.classed('active', true)
 
   selectedNode = selectedLink = mousedownNode = mousedownLink = null
+  markConnectedClean()
 
   if( d3.event.button > 0 || !d3.event.ctrlKey ) return
 
@@ -355,7 +365,8 @@ function mousemove() {
   if( !mousedownNode ) return
 
   // update drag line
-  VIEW.dragLine.attr('d', `M${mousedownNode.x},${mousedownNode.y}L${d3.mouse(this)[0]},${d3.mouse(this)[1]}`)
+  if( d3.event.ctrlKey )
+    VIEW.dragLine.attr('d', `M${mousedownNode.x},${mousedownNode.y}L${d3.mouse(this)[0]},${d3.mouse(this)[1]}`)
 }
 
 function mouseup() {
@@ -405,8 +416,13 @@ function keydown() {
     switch( d3.event.key ) {
       case 'Backspace':
       case 'Delete':
-        deleteNode(selectedNode)
-        selectedNode = null
+        console.log(d3.event)
+        if( d3.event.shiftKey ) {
+          deleteLinksForNode(selectedNode)
+        } else {
+          deleteNode(selectedNode)
+          selectedNode = null
+        }
         break
       case 's':
         setNodeStatic(selectedNode)
@@ -464,6 +480,37 @@ function setNodeStatic(node, val = !node.static) {
 function deleteNode(node) {
   DATA.nodes.splice(DATA.nodes.indexOf(node), 1)
   deleteLinksForNode(node)
+}
+
+let MARKED = []
+
+function markConnectedClean() {
+  // Demark previous links & nodes
+  for( const i of MARKED )
+    i.marked = false
+  MARKED = []
+}
+
+function markConnectedNode(node) {
+  markConnectedClean()
+  // Mark new items
+  MARKED.push(node)
+  const links = DATA.links.filter((l) => l.source === node || l.target === node)
+  for( const l of links )
+    MARKED = MARKED.concat([l, l.source, l.target].filter((v) => MARKED.indexOf(v) < 0))
+  markItems(MARKED)
+  restart()
+}
+
+function markConnectedLink(link) {
+  markConnectedClean()
+  markItems([link, link.source, link.target])
+  restart()
+}
+
+function markItems(items) {
+  for( const i of items )
+    i.marked = true
 }
 
 function deleteLinksForNode(node) {

@@ -60,6 +60,6 @@ svg>g.menu>g.item:hover>circle {
   stroke-width: 2.5px;
 }
 
-svg>g.container.shadow g.node:not(.marked) {
+#container.shadow>g>*:not(.marked) {
   opacity: 0.2
 }
