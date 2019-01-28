@@ -2,245 +2,102 @@
  * netGraph
  * A tool to create your net schema in a simple svg package
  * @version 0.0.1
- * @copyright Sergei Parshev <sergei@parshev.net>
+ * @copyright Rabit <home@rabits.org>
  * @license MIT
  */
 'use strict'
 
-var draw = SVG('drawing')
-var container = SVG.get('container')
-var items = SVG.get('items')
-var links = SVG.get('links')
-var markers = SVG.get('markers')
+// set up SVG for D3
+const colors = d3.scaleOrdinal(d3.schemeCategory10)
+const svg = d3.select('svg')
+const container = svg.select('#container')
 
-var menu = null
-var menu_event = null
-var menu_data = {
-  undefined:[ // Global menu
-    { title: 'Add new item to the workspace', icon: 'add', color: '#0a0', action: function(e) {
-      var item = items.group()
-        .addClass('item')
-        .attr({name: 'noname'})
-        .translate(menu_event.pageX, menu_event.pageY)
-      item.group().addClass('base').circle(0).animate(300).radius(50)
-
-      item.draggy().on('dragend', function() {
-        updateDocumentRect(this.node.getBoundingClientRect())
-      })
-      item.on('mousedown', function(e) {
-        // TODO: select item, show verbose data & links
-        SVG.adopt(e.target).parent('.item').front()
-      })
-      item.on('contextmenu', function(e) {
-        e.stopPropagation()
-        e.preventDefault()
-        showMenu(e, this)
-      })
-    }},
-    { title: 'Save SVG document', icon: 'save', color: '#a0a', action: function() {
-      console.debug('save document')
-      download(cleanSVG(draw.node, 2), 'netGraph.svg', 'image/svg+xml')
-    }},
-  ],
-  item:[ // Item menu
-    { title: 'Remove item from the workspace', icon: 'remove', color: '#a00', action: function(e) {
-      menu_event.t.remove()
-    }},
-    { title: 'Create link', icon: 'link', color: '#aa0', action: function(e) {
-      e.stopPropagation()
-      hideMenu()
-      items.addClass('blink')
-      draw.on('mousedown', function(e) {
-        var target = SVG.adopt(e.target).parent('.item')
-        if( target ) {
-          var conn = menu_event.t.connectable({
-            source: menu_event.t.select('.base').first(),
-            target: target.select('.base').first(),
-            container: links,
-            marker: 'default',
-            sourceAttach: 'perifery',
-            targetAttach: 'perifery',
-          }, target)
-        }
-        draw.off('mousedown')
-        items.removeClass('blink')
-      })
-    }},
-    { title: 'Disconnect all links', icon: 'unlink', color: '#a0a', action: function(e) {
-      // TODO: unlink all the links connected to the target object
-    }},
-  ],
-  link:[ // Link menu
-    { title: 'Destroy link', icon: 'unlink', color: '#a00', action: function(e) {
-      // TODO: remove link connecting two objects
-    }},
-  ]
-}
-
-function showMenu(e, target) {
-  console.debug('menu show')
-  menu = draw.group()
-    .move(e.pageX, e.pageY)
-
-  e.t = target
-  e.cx = e.clientX
-  e.cy = e.clientY
-
-  menu_event = e
-  var data = menu_data[e.t.attr('class')]
-
-  var left_right_triggered = false
-  var angle = 360
-  var sector = 0
-  var item_r = 25
-  var radius = function(){
-    return Math.max(item_r*2, data.length*(item_r+2)*(360/Math.abs(angle))/3.14)
+const menu = Menu({
+  svg: svg,
+  data: {
+    null:[ // Global menu
+      { title: 'Add new node to the workspace (Ctrl+MouseLeft)', icon: 'add', color: '#0a0', action: function(e) {
+        createNode([e.pageX, e.pageY])
+        VIEW.nodes.call(VIEW.drag)
+      }},
+      { title: 'Save SVG document (Shift+S)', icon: 'save', color: '#a0a', action: function() {
+        saveSVG()
+      }},
+      { title: 'Disable force (Shift+F)', icon: 'force', color: '#aaa', action: function() {
+        VIEW.force.stop()
+      }},
+    ],
+    node:[ // Node menu
+      { title: 'Remove node from the workspace (Del)', icon: 'remove', color: '#a00', action: function(e) {
+        deleteNode(selectedNode)
+        selectedNode = null
+      }},
+      { title: 'Disconnect all links (Ctrl+Del)', icon: 'unlink', color: '#a0a', action: function(e) {
+        deleteLinksForNode(selectedNode)
+      }},
+      // TODO
+      /*{ title: 'Create link (Ctrl+MouseLeft)', icon: 'link', color: '#aa0', action: function(e) {
+        menu.hide()
+        items.addClass('blink')
+        svg.on('mousedown', function(e) {
+          var target = SVG.adopt(e.target).parent('.item')
+          if( target ) {
+            var conn = menu_event.t.connectable({
+              source: menu_event.t.select('.base').first(),
+              target: target.select('.base').first(),
+              container: links,
+              marker: 'default',
+              sourceAttach: 'perifery',
+              targetAttach: 'perifery',
+            }, target)
+          }
+          svg.off('mousedown')
+          items.removeClass('blink')
+        })
+      }},*/
+      { title: 'Toggle static (S)', icon: 'static', color: '#0aa', action: function(e) {
+        setNodeStatic(selectedNode)
+      }},
+      { title: 'Edit (E)', icon: 'edit', color: '#0aa', action: function(e) {
+        setNodeEdit(selectedNode)
+      }},
+    ],
+    link:[ // Link menu
+      { title: 'Destroy link (Del)', icon: 'unlink', color: '#a00', action: function(e) {
+        deleteLink(selectedLink)
+        selectedLink = null
+      }},
+    ],
   }
-
-  // Check client boundaries
-  if( radius()+item_r > e.cx ) { // Left
-      left_right_triggered = true
-      console.log('left boundaries')
-      angle *= -0.5
-      sector = 0.5*angle/data.length
-      e.cx = 0
-      menu.x(window.scrollX)
-  }
-  if( radius()+item_r+e.cx > window.innerWidth ) { // Right
-      left_right_triggered = true
-      console.log('right boundaries')
-      angle *= 0.5
-      sector = 0.5*angle/data.length
-      e.cx = window.innerWidth
-      menu.x(window.innerWidth+window.scrollX)
-  }
-  if( radius()+item_r > e.cy ) { // Top
-      console.log('top boundaries')
-      angle *= 0.5
-      sector = sector !== 0 ? sector*0.5 : -90+0.5*angle/data.length
-      e.cy = 0
-      menu.y(window.scrollY)
-  }
-  if( radius()+item_r+e.cy > window.innerHeight ) { // Bottom
-      console.log('bottom boundaries')
-      angle *= -0.5
-      sector = sector !== 0 ? 180-sector*0.5 : -90+0.5*angle/data.length
-      e.cy = window.innerHeight
-      menu.y(window.innerHeight+window.scrollY)
-  }
-  if( !left_right_triggered && sector !== 0 && radius()+item_r > e.cx ) { // Left
-      console.log('left boundaries')
-      angle *= -0.5
-      sector = angle < 0 ? 0.5*angle/data.length : 180+0.5*angle/data.length
-      e.cx = 0
-      menu.x(window.scrollX)
-  }
-  if( !left_right_triggered && sector !== 0 && radius()+item_r+e.cx > window.innerWidth ) { // Right
-      console.log('right boundaries')
-      angle *= 0.5
-      sector = angle > 0 ? 0.5*angle/data.length : 180+0.5*angle/data.length
-      e.cx = window.innerWidth
-      menu.x(window.innerWidth+window.scrollX)
-  }
-
-  radius = radius()
-  for( var i in data ) {
-    var item = menu.group()
-    item.element('title').words(data[i].title)
-    item.circle(item_r*2).fill(data[i].color)
-    item.use('icon-'+data[i].icon).move(item_r-item_r*0.6,item_r-item_r*0.6).size(item_r*1.2)
-    item.on('mousedown', data[i].action)
-    item.opacity(0.0).cx(0).cy(radius).animate(300)
-      .opacity(0.9).rotate(sector+i*angle/data.length, item_r, -radius+item_r).rotate(0)
-  }
-}
-function hideMenu() {
-  console.debug('menu hide')
-  if( menu )
-    menu.remove()
-  menu = null
-}
+})
 
 document.addEventListener('contextmenu', function(e) {
   e.preventDefault()
-  showMenu(e, draw)
+  menu.show(e, svg)
 })
 document.addEventListener('mousedown', function(e) {
-  hideMenu(e.detail)
+  menu.hide()
 })
 
-// Function to download data to a file
-function download(data, filename, type) {
-  var file = new Blob([data], {type: type})
-  if( window.navigator.msSaveOrOpenBlob ) { // IE10+
-    window.navigator.msSaveOrOpenBlob(file, filename)
-  } else { // Others
-    var url = URL.createObjectURL(file)
-    var f = draw.element('foreignObject')
-    var a = document.createElementNS('http://www.w3.org/1999/xhtml', 'a')
-    a.href = url
-    a.download = filename
-    f.node.appendChild(a)
-    a.click()
-    setTimeout(function() {
-      f.remove()
-      window.URL.revokeObjectURL(url)
-    }, 0);
-  }
-}
-
-function beautifyNode(node, indent, level = 1) {
-  var childs = []
-  for( var n of node.childNodes )
-    childs.push(n)
-  for( var n of childs ) {
-    if( n.nodeName === '#text' ) {
-      n.remove()
-      continue
-    }
-    beautifyNode(n, indent, level+1)
-    node.insertBefore(document.createTextNode('\n'+' '.repeat(indent*level)), n)
-  }
-  if( childs.length > 0 )
-    node.appendChild(document.createTextNode('\n'+' '.repeat(indent*(level-1))))
-}
-
-// Clean the svg document and return beautiful xml string
-function cleanSVG(node, level) {
-  var clone = node.cloneNode(true)
-
-  // Removing non-document nodes
-  var to_remove = []
-  for( var n of clone.childNodes ) {
-    if( ['script', 'defs', 'style'].indexOf(n.nodeName) < 0 && n.id !== container.id() )
-      to_remove.push(n)
-  }
-  for( var n of to_remove )
-    n.remove()
-
-  // Let's add text with indent to beautify the container output
-  var c = clone.getElementById(container.id())
-
-  if( ! c.previousSibling || c.previousSibling.nodeName !== '#text' )
-    clone.insertBefore(document.createTextNode('\n  '), c)
-  if( ! c.nextSibling || c.nextSibling.nodeName !== '#text' )
-    clone.insertBefore(document.createTextNode('\n  '), c.nextElementSibling)
-
-  beautifyNode(c, 2, level)
-
-  return clone.outerHTML
-}
+// TODO: bring selected object to front
+/*d3.selection.prototype.moveToFront = function() {
+  return this.each(function() {
+    this.parentNode.appendChild(this);
+  });
+};*/
 
 // Set document size to window size at the first time
-if( draw.width() === 0 || draw.height() === 0 ) {
+if( ! svg.attr('width') || !svg.attr('height') ) {
   updateDocumentRect({top: 0, left: 0, bottom: window.innerHeight, right: window.innerWidth})
 }
 
 function updateDocumentRect(rect) {
-  if( draw.width() < rect.right + window.scrollX )
-    draw.width(rect.right + window.scrollX)
-  if( draw.height() < rect.bottom + window.scrollY )
-    draw.height(rect.bottom + window.scrollY)
+  var width = rect.right + window.scrollX
+  var height = rect.bottom + window.scrollY
+  if( svg.attr('width') < width )
+    svg.attr('width', svg.width = width)
+  if( svg.attr('height') < height )
+    svg.attr('height', svg.height = height)
 }
 
 // Look for document changes to adjust document size
@@ -252,4 +109,404 @@ new MutationObserver(function(mutationsList, observer) {
         updateDocumentRect(node.getBoundingClientRect())
     }
   }
-}).observe(container.node, { attributes: false, childList: true, subtree: true })
+}).observe(container.node(), { attributes: false, childList: true, subtree: true })
+
+let lastNodeId = 0
+const DATA = {
+  nodes: [],
+  links: [],
+}
+const VIEW = {
+  nodes: svg.select('#nodes').selectAll('g'),
+  links: svg.select('#links').selectAll('path'),
+  // Force field
+  force: d3.forceSimulation()
+    .force('link', d3.forceLink().id((d) => d.id).distance(150))
+    .force('charge', d3.forceManyBody().strength(-500))
+    .force('x', d3.forceX(svg.width / 2))
+    .force('y', d3.forceY(svg.height / 2))
+    .on('tick', tick),
+  // Dragging mechanism
+  drag: d3.drag()
+    .on('start', (d) => {
+      if( !d3.event.active ) VIEW.force.alphaTarget(0.3).restart()
+
+      d.fx = d.x
+      d.fy = d.y
+    })
+    .on('drag', (d) => {
+      d.fx = d.sx = d3.event.x
+      d.fy = d.sy = d3.event.y
+    })
+    .on('end', (d) => {
+      if( !d3.event.active ) VIEW.force.alphaTarget(0)
+
+      d.fx = null
+      d.fy = null
+    }),
+  // line displayed when dragging new nodes
+  dragLine: svg.append('svg:path')
+    .attr('class', 'link dragline hidden')
+    .attr('d', 'M0,0L0,0')
+}
+
+// mouse event vars
+let selectedNode = null
+let selectedLink = null
+let mousedownLink = null
+let mousedownNode = null
+let mouseupNode = null
+
+function resetMouseVars() {
+  mousedownNode = null
+  mouseupNode = null
+  mousedownLink = null
+}
+
+// update force layout (called automatically each iteration)
+function tick() {
+  VIEW.nodes.attr('transform', (d) => d.static ? `translate(${d.x = d.sx},${d.y = d.sy})` : `translate(${d.x},${d.y})`)
+
+  // draw directed edges with proper padding from node centers
+  VIEW.links.attr('d', (d) => {
+    const deltaX = d.target.x - d.source.x
+    const deltaY = d.target.y - d.source.y
+    const dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
+    const normX = deltaX / dist
+    const normY = deltaY / dist
+    const sourcePadding = d.left ? 17 : 12
+    const targetPadding = d.right ? 17 : 12
+    const sourceX = d.source.x + (sourcePadding * normX)
+    const sourceY = d.source.y + (sourcePadding * normY)
+    const targetX = d.target.x - (targetPadding * normX)
+    const targetY = d.target.y - (targetPadding * normY)
+
+    return `M${sourceX},${sourceY}L${targetX},${targetY}`
+  })
+}
+
+// update graph (called when needed)
+function restart() {
+  console.log('exec restart')
+
+  VIEW.nodes = VIEW.nodes.data(DATA.nodes, (d) => d.id)
+
+  // update existing nodes (static & selected visual states)
+  VIEW.nodes
+    .classed('static', (d) => d.static)
+    .classed('selected', (d) => d === selectedNode)
+  VIEW.nodes.selectAll('.bg')
+    .style('fill', (d) => (d === selectedNode) ? d3.rgb(colors(d.id)).brighter().toString() : colors(d.id))
+  VIEW.nodes.selectAll('.name')
+    .text((d) => d.name)
+    .visible
+
+  // remove old nodes
+  VIEW.nodes.exit().remove()
+
+  // add new nodes
+  const g = VIEW.nodes.enter().append('svg:g')
+    .attr('menuType', 'node')
+    .classed('node', true)
+    .classed('selected', (d) => d === selectedNode)
+    .classed('static', (d) => d.static)
+    .on('contextmenu', function() {
+      d3.event.preventDefault()
+      d3.event.stopPropagation()
+      menu.show(d3.event, d3.select(this))
+    })
+
+  g.append('svg:circle')
+    .attr('class', 'bg')
+    .attr('r', 12)
+    .style('fill', (d) => (d === selectedNode) ? d3.rgb(colors(d.id)).brighter().toString() : colors(d.id))
+    .style('stroke', (d) => d3.rgb(colors(d.id)).darker().toString())
+    .on('mousedown', (d) => {
+      menu.hide()
+      // select node
+      selectedNode = mousedownNode = d
+      // TODO: d3.select(this).moveToFront()
+      selectedLink = null
+
+      if( d3.event.button > 0 )
+        d3.event.stopPropagation()
+      if( d3.event.ctrlKey ) {
+        d3.event.stopPropagation()
+        // reposition drag line
+        VIEW.dragLine
+          .style('marker-end', 'url(#end-arrow)')
+          .classed('hidden', false)
+          .attr('d', `M${mousedownNode.x},${mousedownNode.y}L${mousedownNode.x},${mousedownNode.y}`)
+      }
+
+      restart()
+    })
+    .on('mouseup', (d) => {
+      if( !mousedownNode ) return
+
+      // needed by FF
+      VIEW.dragLine
+        .classed('hidden', true)
+        .style('marker-end', '')
+
+      // check for drag-to-self
+      mouseupNode = d
+      if( mouseupNode === mousedownNode ) {
+        resetMouseVars()
+        return
+      }
+
+      // unenlarge target node
+      d3.select(this).attr('transform', '')
+
+      // add link to graph (update if exists)
+      // NB: links are strictly source < target; arrows separately specified by booleans
+      const isRight = mousedownNode.id < mouseupNode.id
+      const source = isRight ? mousedownNode : mouseupNode
+      const target = isRight ? mouseupNode : mousedownNode
+
+      const link = DATA.links.filter((l) => l.source === source && l.target === target)[0]
+      if( link ) {
+        link[isRight ? 'right' : 'left'] = true
+      } else {
+        DATA.links.push({ source, target, left: !isRight, right: isRight })
+      }
+
+      // select new link
+      selectedLink = link
+      selectedNode = null
+      restart()
+    })
+
+  // show node IDs
+  g.append('svg:text')
+    .attr('x', 0)
+    .attr('y', -20)
+    .attr('class', 'name')
+    .text((d) => d.name)
+
+  // TODO: node editor
+  /*var f = g.append('svg:foreignObject')
+    .attr('x', 0)
+    .attr('y', -20)
+    .attr('height', 100)
+    .attr('width', 100)
+  if( f.node() ) {
+    f.node().appendChild(document.createElementNS('http://www.w3.org/1999/xhtml', 'input'))
+    f.select('div').text('lool')
+  }*/
+
+  VIEW.nodes = g.merge(VIEW.nodes)
+
+  VIEW.links = VIEW.links.data(DATA.links)
+
+  // update existing links
+  VIEW.links.classed('selected', (d) => d === selectedLink)
+    .style('marker-start', (d) => d.left ? 'url(#start-arrow)' : '')
+    .style('marker-end', (d) => d.right ? 'url(#end-arrow)' : '')
+
+  // remove old links
+  VIEW.links.exit().remove()
+
+  // add new links
+  VIEW.links = VIEW.links.enter().append('svg:path')
+    .attr('menuType', 'link')
+    .attr('class', 'link')
+    .classed('selected', (d) => d === selectedLink)
+    .style('marker-start', (d) => d.left ? 'url(#start-arrow)' : '')
+    .style('marker-end', (d) => d.right ? 'url(#end-arrow)' : '')
+    .on('contextmenu', function() {
+      d3.event.preventDefault()
+      d3.event.stopPropagation()
+      menu.show(d3.event, d3.select(this))
+    })
+    .on('mousedown', (d) => {
+      menu.hide()
+      d3.event.stopPropagation()
+      if( d3.event.ctrlKey ) return
+
+      // select link
+      selectedLink = mousedownLink = d
+      selectedNode = null
+      restart()
+    })
+    .merge(VIEW.links)
+
+  // set the graph in motion
+  VIEW.force.nodes(DATA.nodes)
+    .force('link').links(DATA.links)
+
+  VIEW.force.alphaTarget(0.3).restart()
+}
+
+function mousedown() {
+  // because :active only works in WebKit?
+  svg.classed('active', true)
+
+  selectedNode = selectedLink = mousedownNode = mousedownLink = null
+
+  if( d3.event.button > 0 || !d3.event.ctrlKey ) return
+
+  // insert new node at point
+  createNode(d3.mouse(this))
+}
+
+function mousemove() {
+  if( !mousedownNode ) return
+
+  // update drag line
+  VIEW.dragLine.attr('d', `M${mousedownNode.x},${mousedownNode.y}L${d3.mouse(this)[0]},${d3.mouse(this)[1]}`)
+}
+
+function mouseup() {
+  if( mousedownNode ) {
+    // hide drag line
+    VIEW.dragLine
+      .classed('hidden', true)
+      .style('marker-end', '')
+  }
+
+  // because :active only works in WebKit?
+  svg.classed('active', false)
+
+  restart()
+}
+
+// only respond once per keydown
+let lastKeyDown = -1
+
+function keydown() {
+  if( lastKeyDown !== -1 ) return
+  lastKeyDown = d3.event.keyCode
+
+  if( d3.event.shiftKey ) {
+    switch( d3.event.key ) {
+      case 'S':
+        saveSVG()
+        return
+        break
+      case 'F':
+        VIEW.force.stop()
+        return
+        break
+    }
+  }
+
+  // Ctrl
+  if( d3.event.keyCode === 17 ) {
+    VIEW.nodes.on('.drag', null)
+    svg.classed('ctrl', true)
+    return
+  }
+
+  if( !selectedNode && !selectedLink ) return
+  
+  if( selectedNode ) {
+    switch( d3.event.key ) {
+      case 'Backspace':
+      case 'Delete':
+        deleteNode(selectedNode)
+        selectedNode = null
+        break
+      case 's':
+        setNodeStatic(selectedNode)
+        break
+      case 'e':
+        setNodeEdit(selectedNode)
+        break
+      default:
+        return
+    }
+  }
+  if( selectedLink ) {
+    switch( d3.event.keyCode ) {
+      case 'Backspace': // backspace
+      case 'Delete': // delete
+        deleteLink(selectedLink)
+        selectedLink = null
+        break
+      default:
+        return
+    }
+  }
+}
+
+function createNode(point) {
+  console.log('create node')
+  const node = {
+    id: ++lastNodeId,
+    name: lastNodeId,
+    static: false,
+    sx: point[0],
+    sy: point[1],
+    x: point[0],
+    y: point[1],
+  }
+  DATA.nodes.push(node)
+
+  restart()
+}
+
+function setNodeEdit(node, val = !node.edit) {
+  node.edit = val
+  restart()
+}
+
+function setNodeStatic(node, val = !node.static) {
+  // Toggle if no value is set
+  if( node.static = val ) {
+    node.sx = node.x
+    node.sy = node.y
+  }
+  restart()
+}
+
+function deleteNode(node) {
+  DATA.nodes.splice(DATA.nodes.indexOf(node), 1)
+  deleteLinksForNode(node)
+}
+
+function deleteLinksForNode(node) {
+  const toSplice = DATA.links.filter((l) => l.source === node || l.target === node)
+  for( const l of toSplice )
+    DATA.links.splice(DATA.links.indexOf(l), 1)
+  restart()
+}
+
+function deleteLink(link) {
+  DATA.links.splice(DATA.links.indexOf(link), 1)
+  restart()
+}
+
+/**
+ * @dir: -1 left, 0 both, 1 right
+ */
+function setLinkDirection(link, dir) {
+  link.left = dir <= 0
+  link.right = dir >= 0
+  restart()
+}
+
+function saveSVG() {
+  console.debug('save document')
+  download(cleanSVG(svg.node(), 2), 'netGraph.svg', 'image/svg+xml')
+}
+
+function keyup() {
+  lastKeyDown = -1
+
+  // ctrl
+  if( d3.event.keyCode === 17 ) {
+    VIEW.nodes.call(VIEW.drag)
+    svg.classed('ctrl', false)
+  }
+}
+
+// app starts here
+svg.on('mousedown', mousedown)
+  .on('mousemove', mousemove)
+  .on('mouseup', mouseup)
+d3.select(window)
+  .on('keydown', keydown)
+  .on('keyup', keyup)
+restart()

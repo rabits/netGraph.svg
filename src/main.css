@@ -1,19 +1,65 @@
-g.item>.base>circle {
-  stroke-width:3;
-  stroke:#aaa;
-  fill:#888;
-}
-g.item:hover>.base>circle {
-  stroke-width:3;
-  stroke:#f00;
-  opacity:0.8;
+svg {
+  background-color: #FFF;
+  cursor: default;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+  -o-user-select: none;
+  user-select: none;
 }
 
-#items.blink>g.item>.base>circle {
-  animation:blinking 0.8s infinite;
+svg.ctrl:not(.active) {
+  cursor: crosshair;
 }
-@keyframes blinking {
-  0%  { fill: inherit; }
-  50% { fill: #0007; }
-  100%{ fill: inherit; }
+
+path.link {
+  fill: none;
+  stroke: #000;
+  stroke-width: 4px;
+  cursor: default;
+}
+
+svg:not(.active):not(.ctrl) path.link {
+  cursor: pointer;
+}
+
+path.link.selected {
+  stroke-dasharray: 10,2;
+}
+
+path.link.dragline {
+  pointer-events: none;
+}
+
+path.link.hidden {
+  stroke-width: 0;
+}
+
+#nodes>g.node .bg {
+  stroke-width: 1.5px;
+  cursor: pointer;
+}
+
+#nodes>g.node.static .bg {
+  stroke: #000 !important;
+  stroke-width: 2.5px;
+}
+
+text {
+  font: 12px sans-serif;
+  pointer-events: none;
+}
+
+#nodes>g.node>text.name {
+  text-anchor: middle;
+  font-weight: bold;
+}
+
+svg>g.menu>g.item:hover>circle {
+  stroke: #000 !important;
+  stroke-width: 2.5px;
+}
+
+svg>g.container.shadow g.node:not(.marked) {
+  opacity: 0.2
 }

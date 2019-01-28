@@ -1,4 +1,4 @@
-Copyright (c) 2019 Sergei Parshev <sergei@parshev.net>
+Copyright (c) 2019 Rabit <home@rabits.org>
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
