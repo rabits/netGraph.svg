@@ -1,6 +1,8 @@
 netGraph.svg
 ============
 
+[![CircleCI](https://img.shields.io/circleci/project/github/rabits/netGraph.svg/master.svg)](https://circleci.com/gh/rabits/netGraph.svg)
+
 SVG-application to visualize network topology & automate your network changes
 
 Available actions:
@@ -18,6 +20,8 @@ The netGraph.svg could work as is - just open the main.svg from the repository i
 
 When you opened the SVG file in the first time, you will see nothing, but empty space. Click
 secondary mouse button on the empty space and you will see the menu items available.
+
+Check how the project is working right here: [netGraph.svg](https://rabits.github.io/netGraph.svg/main.svg)
 
 ### Controls
 

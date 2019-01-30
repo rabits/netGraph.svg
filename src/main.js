@@ -12,7 +12,7 @@ const colors = d3.scaleOrdinal(d3.schemeCategory10)
 const svg = d3.select('svg')
 const container = svg.select('#container')
 
-const menu = Menu({
+const menu = new Menu({
   svg: svg,
   data: {
     null:[ // Global menu
@@ -28,11 +28,11 @@ const menu = Menu({
       }},
     ],
     node:[ // Node menu
-      { title: 'Remove node from the workspace (Del)', icon: 'remove', color: '#a00', action: function(e) {
+      { title: 'Remove node from the workspace (Del)', icon: 'remove', color: '#a00', action: function() {
         deleteNode(selectedNode)
         selectedNode = null
       }},
-      { title: 'Disconnect all links (Shift+Del)', icon: 'unlink', color: '#a0a', action: function(e) {
+      { title: 'Disconnect all links (Shift+Del)', icon: 'unlink', color: '#a0a', action: function() {
         deleteLinksForNode(selectedNode)
       }},
       // TODO
@@ -55,15 +55,15 @@ const menu = Menu({
           items.removeClass('blink')
         })
       }},*/
-      { title: 'Toggle static (S)', icon: 'static', color: '#0aa', action: function(e) {
+      { title: 'Toggle static (S)', icon: 'static', color: '#0aa', action: function() {
         setNodeStatic(selectedNode)
       }},
-      { title: 'Edit (E)', icon: 'edit', color: '#0aa', action: function(e) {
+      { title: 'Edit (E)', icon: 'edit', color: '#0aa', action: function() {
         setNodeEdit(selectedNode)
       }},
     ],
     link:[ // Link menu
-      { title: 'Destroy link (Del)', icon: 'unlink', color: '#a00', action: function(e) {
+      { title: 'Destroy link (Del)', icon: 'unlink', color: '#a00', action: function() {
         deleteLink(selectedLink)
         selectedLink = null
       }},
@@ -75,7 +75,7 @@ document.addEventListener('contextmenu', function(e) {
   e.preventDefault()
   menu.show(e, svg)
 })
-document.addEventListener('mousedown', function(e) {
+document.addEventListener('mousedown', function() {
   menu.hide()
 })
 
@@ -101,8 +101,7 @@ function updateDocumentRect(rect) {
 }
 
 // Look for document changes to adjust document size
-new MutationObserver(function(mutationsList, observer) {
-  console.log('mutation here')
+new MutationObserver(function(mutationsList) {
   for( var mutation of mutationsList ) {
     for( var node of mutation.addedNodes ) {
       if( node.getBoundingClientRect )
@@ -112,7 +111,7 @@ new MutationObserver(function(mutationsList, observer) {
 }).observe(container.node(), { attributes: false, childList: true, subtree: true })
 
 let lastNodeId = 0
-const DATA = {
+window.DATA = DATA || {
   nodes: [],
   links: [],
 }
@@ -153,14 +152,12 @@ const VIEW = {
 // mouse event vars
 let selectedNode = null
 let selectedLink = null
-let mousedownLink = null
 let mousedownNode = null
 let mouseupNode = null
 
 function resetMouseVars() {
   mousedownNode = null
   mouseupNode = null
-  mousedownLink = null
 }
 
 // update force layout (called automatically each iteration)
@@ -187,9 +184,7 @@ function tick() {
 
 // update graph (called when needed)
 function restart() {
-  console.log('exec restart')
-
-  container.classed('shadow', (d) => selectedNode || selectedLink)
+  container.classed('shadow', () => selectedNode || selectedLink)
 
   VIEW.nodes = VIEW.nodes.data(DATA.nodes, (d) => d.id)
 
@@ -261,9 +256,6 @@ function restart() {
         return
       }
 
-      // unenlarge target node
-      d3.select(this).attr('transform', '')
-
       // add link to graph (update if exists)
       // NB: links are strictly source < target; arrows separately specified by booleans
       const isRight = mousedownNode.id < mouseupNode.id
@@ -334,7 +326,7 @@ function restart() {
       if( d3.event.ctrlKey ) return
 
       // select link
-      selectedLink = mousedownLink = d
+      selectedLink = d
       selectedNode = null
       markConnectedLink(selectedLink)
       restart()
@@ -352,7 +344,7 @@ function mousedown() {
   // because :active only works in WebKit?
   svg.classed('active', true)
 
-  selectedNode = selectedLink = mousedownNode = mousedownLink = null
+  selectedNode = selectedLink = mousedownNode = null
   markConnectedClean()
 
   if( d3.event.button > 0 || !d3.event.ctrlKey ) return
@@ -395,11 +387,9 @@ function keydown() {
       case 'S':
         saveSVG()
         return
-        break
       case 'F':
         VIEW.force.stop()
         return
-        break
     }
   }
 
@@ -416,7 +406,6 @@ function keydown() {
     switch( d3.event.key ) {
       case 'Backspace':
       case 'Delete':
-        console.log(d3.event)
         if( d3.event.shiftKey ) {
           deleteLinksForNode(selectedNode)
         } else {
@@ -435,11 +424,14 @@ function keydown() {
     }
   }
   if( selectedLink ) {
-    switch( d3.event.keyCode ) {
+    switch( d3.event.key ) {
       case 'Backspace': // backspace
       case 'Delete': // delete
         deleteLink(selectedLink)
         selectedLink = null
+        break
+      case 'l':
+        setLinkDirection(selectedLink)
         break
       default:
         return
@@ -448,7 +440,6 @@ function keydown() {
 }
 
 function createNode(point) {
-  console.log('create node')
   const node = {
     id: ++lastNodeId,
     name: lastNodeId,
@@ -470,7 +461,8 @@ function setNodeEdit(node, val = !node.edit) {
 
 function setNodeStatic(node, val = !node.static) {
   // Toggle if no value is set
-  if( node.static = val ) {
+  node.static = val
+  if( node.static ) {
     node.sx = node.x
     node.sy = node.y
   }
@@ -528,14 +520,16 @@ function deleteLink(link) {
 /**
  * @dir: -1 left, 0 both, 1 right
  */
-function setLinkDirection(link, dir) {
+function setLinkDirection(link, dir = null) {
+  // Toggle if no direction is set
+  if( dir === null )
+    dir = link.left ? (link.right ? 1 : 0 ) : -1
   link.left = dir <= 0
   link.right = dir >= 0
   restart()
 }
 
 function saveSVG() {
-  console.debug('save document')
   download(cleanSVG(svg.node(), 2), 'netGraph.svg', 'image/svg+xml')
 }
 

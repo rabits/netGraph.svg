@@ -28,10 +28,10 @@ function download(data, filename, type) {
 }
 
 function beautifyNode(node, indent, level = 1) {
-  var childs = []
-  for( var n of node.childNodes )
+  var childs = [], n
+  for( n of node.childNodes )
     childs.push(n)
-  for( var n of childs ) {
+  for( n of childs ) {
     if( n.nodeName === '#text' ) {
       n.remove()
       continue
@@ -48,12 +48,12 @@ function cleanSVG(node, level) {
   var clone = node.cloneNode(true)
 
   // Removing non-document nodes
-  var to_remove = []
-  for( var n of clone.childNodes ) {
+  var to_remove = [], n
+  for( n of clone.childNodes ) {
     if( ['script', 'defs', 'style'].indexOf(n.nodeName) < 0 && n.id !== container.attr('id') )
       to_remove.push(n)
   }
-  for( var n of to_remove )
+  for( n of to_remove )
     n.remove()
 
   // Let's add text with indent to beautify the container output

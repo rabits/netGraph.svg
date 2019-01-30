@@ -25,5 +25,6 @@
   <script type="text/javascript" xlink:href="https://cdnjs.cloudflare.com/ajax/libs/d3-transform/1.0.4/d3-transform.min.js"></script>
   <script type="text/javascript" xlink:href="src/menu.js"></script>
   <script type="text/javascript" xlink:href="src/routines.js"></script>
+  <script type="text/javascript" xlink:href="src/data.js"></script>
   <script type="text/javascript" xlink:href="src/main.js"></script>
 </svg>

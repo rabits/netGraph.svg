@@ -1,0 +1,74 @@
+{
+  "name": "netGraph.svg",
+  "version": "0.0.1",
+  "homepage": "https://rabits.github.io/netGraph.svg/main.svg",
+  "description": "",
+  "scripts": {
+    "build": "node build.js",
+    "test-dev": "eslint bundle.js",
+    "test": "eslint -f junit -o reports/junit/eslint-results.xml out/bundle.js || true"
+  },
+  "keywords": [],
+  "author": {
+    "name": "Rabit",
+    "email": "home@rabits.org",
+    "url": "https://github.com/rabits/"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rabits/netGraph.svg.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rabits/netGraph.svg/issues"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "clean-css": "^4.2.1",
+    "eslint": "~5.12.1",
+    "terser": "^3.14.1",
+    "xml-js": "^1.6.9"
+  },
+  "dependencies": {
+    "babel-minify": "^0.5.0",
+    "clean-css": "^4.2.1",
+    "d3": "^5.7.0",
+    "d3-transform": "^1.0.4",
+    "uglify-js": "^3.4.9"
+  },
+  "eslintConfig": {
+    "globals": {
+      "d3": true,
+      "d3Transform": true
+    },
+    "env": {
+      "browser": true,
+      "es6": true
+    },
+    "extends": "eslint:recommended",
+    "parserOptions": {
+      "ecmaVersion": 2015,
+      "sourceType": "module"
+    },
+    "rules": {
+      "indent": [
+        "error",
+        2,
+        {
+          "SwitchCase": 1
+        }
+      ],
+      "linebreak-style": [
+        "error",
+        "unix"
+      ],
+      "quotes": [
+        "error",
+        "single"
+      ],
+      "semi": [
+        "error",
+        "never"
+      ]
+    }
+  }
+}
