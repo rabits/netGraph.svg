@@ -16,12 +16,17 @@ Available actions:
 
 ## Getting Started
 
+Check how the project is working right here:
+* Latest good bundle build [netGraphi.svg](https://circleci.com/api/v1.1/project/github/rabits/netGraph.svg/latest/artifacts/0/home/circleci/netGraph.svg/out/netGraph.svg?branch=master&filter=successful)
+* Current master multifile [main.svg](https://rabits.github.io/netGraph.svg/main.svg)
+
 The netGraph.svg could work as is - just open the main.svg from the repository in your browser.
 
 When you opened the SVG file in the first time, you will see nothing, but empty space. Click
 secondary mouse button on the empty space and you will see the menu items available.
 
-Check how the project is working right here: [netGraph.svg](https://rabits.github.io/netGraph.svg/main.svg)
+When you created the graph, relations & connections - you can save it. Right click on the empty
+space and select Save SVG. It will save results of your work.
 
 ### Controls
 

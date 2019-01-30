@@ -110,11 +110,6 @@ new MutationObserver(function(mutationsList) {
   }
 }).observe(container.node(), { attributes: false, childList: true, subtree: true })
 
-let lastNodeId = 0
-window.DATA = DATA || {
-  nodes: [],
-  links: [],
-}
 const VIEW = {
   nodes: svg.select('#nodes').selectAll('g'),
   links: svg.select('#links').selectAll('path'),
@@ -401,7 +396,7 @@ function keydown() {
   }
 
   if( !selectedNode && !selectedLink ) return
-  
+
   if( selectedNode ) {
     switch( d3.event.key ) {
       case 'Backspace':
@@ -439,6 +434,7 @@ function keydown() {
   }
 }
 
+let lastNodeId = 0
 function createNode(point) {
   const node = {
     id: ++lastNodeId,

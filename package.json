@@ -5,7 +5,7 @@
   "description": "",
   "scripts": {
     "build": "node build.js",
-    "test-dev": "eslint bundle.js",
+    "test-dev": "eslint out/bundle.js",
     "test": "eslint -f junit -o reports/junit/eslint-results.xml out/bundle.js || true"
   },
   "keywords": [],
@@ -47,7 +47,7 @@
     "extends": "eslint:recommended",
     "parserOptions": {
       "ecmaVersion": 2015,
-      "sourceType": "module"
+      "sourceType": "script"
     },
     "rules": {
       "indent": [
@@ -57,8 +57,18 @@
           "SwitchCase": 1
         }
       ],
-      "linebreak-style": [
+      "no-trailing-spaces": "error",
+      "keyword-spacing": [
         "error",
+        { "overrides": {
+            "if": { "after": false },
+            "for": { "after": false },
+            "while": { "after": false },
+            "switch": { "after": false }
+        }}
+      ],
+      "linebreak-style": [
+        "error", 
         "unix"
       ],
       "quotes": [

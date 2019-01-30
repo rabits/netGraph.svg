@@ -31,7 +31,7 @@ for( var i in js.svg.script ) {
 js.svg.script = js.svg.script.filter(x => x)
 
 // Time to create output directory
-fs.mkdirSync('out')
+try { fs.mkdirSync('out') } catch(e){}
 
 if( bundle ) {
   // Writing bundle for future linting
