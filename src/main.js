@@ -12,13 +12,15 @@ const colors = d3.scaleOrdinal(d3.schemeCategory10)
 const svg = d3.select('svg')
 const container = svg.select('#container')
 
+let drag_enabled = true
+
 const menu = new Menu({
   svg: svg,
   data: {
     null:[ // Global menu
       { title: 'Add new node to the workspace (Ctrl+MouseLeft)', icon: 'add', color: '#0a0', action: function(e) {
         createNode([e.pageX, e.pageY])
-        VIEW.nodes.call(VIEW.drag)
+        restart()
       }},
       { title: 'Save SVG document (Shift+S)', icon: 'save', color: '#a0a', action: function() {
         saveSVG()
@@ -28,6 +30,10 @@ const menu = new Menu({
       }},
     ],
     node:[ // Node menu
+      { title: 'Show/Hide childrens (C)', icon: 'childrens', color: '#a00', action: function() {
+        selectedNode.setShowChildrens()
+        restart()
+      }},
       { title: 'Remove node from the workspace (Del)', icon: 'remove', color: '#a00', action: function() {
         deleteNode(selectedNode)
         selectedNode = null
@@ -111,28 +117,28 @@ new MutationObserver(function(mutationsList) {
 }).observe(container.node(), { attributes: false, childList: true, subtree: true })
 
 const VIEW = {
-  nodes: svg.select('#nodes').selectAll('g'),
-  links: svg.select('#links').selectAll('path'),
+  nodes: container.select('#nodes').selectAll('g'),
+  links: container.select('#links').selectAll('path'),
   // Force field
   force: d3.forceSimulation()
-    .force('link', d3.forceLink().id((d) => d.id).distance(150))
+    .force('link', d3.forceLink().id(d => d.id).distance(150))
     .force('charge', d3.forceManyBody().strength(-500))
     .force('x', d3.forceX(svg.width / 2))
     .force('y', d3.forceY(svg.height / 2))
     .on('tick', tick),
   // Dragging mechanism
   drag: d3.drag()
-    .on('start', (d) => {
+    .on('start', d => {
       if( !d3.event.active ) VIEW.force.alphaTarget(0.3).restart()
 
       d.fx = d.x
       d.fy = d.y
     })
-    .on('drag', (d) => {
+    .on('drag', d => {
       d.fx = d.sx = d3.event.x
       d.fy = d.sy = d3.event.y
     })
-    .on('end', (d) => {
+    .on('end', d => {
       if( !d3.event.active ) VIEW.force.alphaTarget(0)
 
       d.fx = null
@@ -157,10 +163,10 @@ function resetMouseVars() {
 
 // update force layout (called automatically each iteration)
 function tick() {
-  VIEW.nodes.attr('transform', (d) => d.static ? `translate(${d.x = d.sx},${d.y = d.sy})` : `translate(${d.x},${d.y})`)
+  VIEW.nodes.attr('transform', d => d.static ? `translate(${d.x = d.sx},${d.y = d.sy})` : `translate(${d.x},${d.y})`)
 
   // draw directed edges with proper padding from node centers
-  VIEW.links.attr('d', (d) => {
+  VIEW.links.attr('d', d => {
     const deltaX = d.target.x - d.source.x
     const deltaY = d.target.y - d.source.y
     const dist = Math.sqrt(deltaX * deltaX + deltaY * deltaY)
@@ -181,18 +187,17 @@ function tick() {
 function restart() {
   container.classed('shadow', () => selectedNode || selectedLink)
 
-  VIEW.nodes = VIEW.nodes.data(DATA.nodes, (d) => d.id)
+  VIEW.nodes = VIEW.nodes.data(DATA.nodes, d => d.id)
 
   // update existing nodes (static & selected visual states)
   VIEW.nodes
-    .classed('static', (d) => d.static)
-    .classed('selected', (d) => d === selectedNode)
-    .classed('marked', (d) => d.marked)
+    .classed('static', d => d.static)
+    .classed('selected', d => d === selectedNode)
+    .classed('marked', d => d.marked)
   VIEW.nodes.selectAll('.bg')
-    .style('fill', (d) => (d === selectedNode) ? d3.rgb(colors(d.id)).brighter().toString() : colors(d.id))
+    .style('fill', d => (d === selectedNode) ? d3.rgb(colors(d.id)).brighter().toString() : colors(d.id))
   VIEW.nodes.selectAll('.name')
-    .text((d) => d.name)
-    .visible
+    .text(d => d.name)
 
   // remove old nodes
   VIEW.nodes.exit().remove()
@@ -201,9 +206,9 @@ function restart() {
   const g = VIEW.nodes.enter().append('svg:g')
     .attr('menuType', 'node')
     .classed('node', true)
-    .classed('selected', (d) => d === selectedNode)
-    .classed('marked', (d) => d.marked)
-    .classed('static', (d) => d.static)
+    .classed('selected', d => d === selectedNode)
+    .classed('marked', d => d.marked)
+    .classed('static', d => d.static)
     .on('contextmenu', function() {
       d3.event.preventDefault()
       d3.event.stopPropagation()
@@ -213,9 +218,9 @@ function restart() {
   g.append('svg:circle')
     .attr('class', 'bg')
     .attr('r', 12)
-    .style('fill', (d) => (d === selectedNode) ? d3.rgb(colors(d.id)).brighter().toString() : colors(d.id))
-    .style('stroke', (d) => d3.rgb(colors(d.id)).darker().toString())
-    .on('mousedown', (d) => {
+    .style('fill', d => (d === selectedNode) ? d3.rgb(colors(d.id)).brighter().toString() : colors(d.id))
+    .style('stroke', d => d3.rgb(colors(d.id)).darker().toString())
+    .on('mousedown', d => {
       menu.hide()
       // select node
       selectedNode = mousedownNode = d
@@ -236,7 +241,7 @@ function restart() {
 
       restart()
     })
-    .on('mouseup', (d) => {
+    .on('mouseup', d => {
       if( !mousedownNode ) return
 
       // needed by FF
@@ -246,27 +251,12 @@ function restart() {
 
       // check for drag-to-self
       mouseupNode = d
-      if( mouseupNode === mousedownNode ) {
-        resetMouseVars()
-        return
-      }
+      if( mouseupNode === mousedownNode )
+        return resetMouseVars()
 
-      // add link to graph (update if exists)
-      // NB: links are strictly source < target; arrows separately specified by booleans
-      const isRight = mousedownNode.id < mouseupNode.id
-      const source = isRight ? mousedownNode : mouseupNode
-      const target = isRight ? mouseupNode : mousedownNode
-
-      const link = DATA.links.filter((l) => l.source === source && l.target === target)[0]
-      if( link ) {
-        link[isRight ? 'right' : 'left'] = true
-      } else {
-        DATA.links.push({ source, target, left: !isRight, right: isRight })
-      }
-
-      // select new link
-      selectedLink = link
+      selectedLink = createLink(Link, mousedownNode, mouseupNode)
       selectedNode = null
+
       restart()
     })
 
@@ -275,7 +265,10 @@ function restart() {
     .attr('x', 0)
     .attr('y', -20)
     .attr('class', 'name')
-    .text((d) => d.name)
+    .text(d => d.name)
+
+  if( drag_enabled )
+    g.call(VIEW.drag)
 
   // TODO: node editor
   /*var f = g.append('svg:foreignObject')
@@ -294,10 +287,10 @@ function restart() {
 
   // update existing links
   VIEW.links
-    .classed('selected', (d) => d === selectedLink)
-    .classed('marked', (d) => d.marked)
-    .style('marker-start', (d) => d.left ? 'url(#start-arrow)' : '')
-    .style('marker-end', (d) => d.right ? 'url(#end-arrow)' : '')
+    .classed('selected', d => d === selectedLink)
+    .classed('marked', d => d.marked)
+    .style('marker-start', d => d.left ? 'url(#start-arrow)' : '')
+    .style('marker-end', d => d.right ? 'url(#end-arrow)' : '')
 
   // remove old links
   VIEW.links.exit().remove()
@@ -306,16 +299,16 @@ function restart() {
   VIEW.links = VIEW.links.enter().append('svg:path')
     .attr('menuType', 'link')
     .attr('class', 'link')
-    .classed('selected', (d) => d === selectedLink)
-    .classed('marked', (d) => d.marked)
-    .style('marker-start', (d) => d.left ? 'url(#start-arrow)' : '')
-    .style('marker-end', (d) => d.right ? 'url(#end-arrow)' : '')
+    .classed('selected', d => d === selectedLink)
+    .classed('marked', d => d.marked)
+    .style('marker-start', d => d.left ? 'url(#start-arrow)' : '')
+    .style('marker-end', d => d.right ? 'url(#end-arrow)' : '')
     .on('contextmenu', function() {
       d3.event.preventDefault()
       d3.event.stopPropagation()
       menu.show(d3.event, d3.select(this))
     })
-    .on('mousedown', (d) => {
+    .on('mousedown', d => {
       menu.hide()
       d3.event.stopPropagation()
       if( d3.event.ctrlKey ) return
@@ -346,6 +339,7 @@ function mousedown() {
 
   // insert new node at point
   createNode(d3.mouse(this))
+  restart()
 }
 
 function mousemove() {
@@ -390,6 +384,7 @@ function keydown() {
 
   // Ctrl
   if( d3.event.keyCode === 17 ) {
+    drag_enabled = false
     VIEW.nodes.on('.drag', null)
     svg.classed('ctrl', true)
     return
@@ -446,8 +441,22 @@ function createNode(point) {
     y: point[1],
   }
   DATA.nodes.push(node)
+}
 
-  restart()
+/**
+ * Create link and add to graph (if not exists)
+ * Types:
+ *   - Link - just a link between two nodes
+ *   - RelativeLink - parent-child relations
+ *   - GroupLink - link contains multiple links
+ */
+function createLink(Type, source, target) {
+  let link = DATA.links.filter(l => l.source === source && l.target === target)[0]
+  if( !link ) {
+    link = new Type({ source, target })
+    DATA.links.push(link)
+  }
+  return link
 }
 
 function setNodeEdit(node, val = !node.edit) {
@@ -483,9 +492,9 @@ function markConnectedNode(node) {
   markConnectedClean()
   // Mark new items
   MARKED.push(node)
-  const links = DATA.links.filter((l) => l.source === node || l.target === node)
+  const links = DATA.links.filter(l => l.source === node || l.target === node)
   for( const l of links )
-    MARKED = MARKED.concat([l, l.source, l.target].filter((v) => MARKED.indexOf(v) < 0))
+    MARKED = MARKED.concat([l, l.source, l.target].filter(v => MARKED.indexOf(v) < 0))
   markItems(MARKED)
   restart()
 }
@@ -502,8 +511,8 @@ function markItems(items) {
 }
 
 function deleteLinksForNode(node) {
-  const toSplice = DATA.links.filter((l) => l.source === node || l.target === node)
-  for( const l of toSplice )
+  let to_remove = DATA.links.filter(l => l.source === node || l.target === node)
+  for( const l of to_remove )
     DATA.links.splice(DATA.links.indexOf(l), 1)
   restart()
 }
@@ -534,6 +543,7 @@ function keyup() {
 
   // ctrl
   if( d3.event.keyCode === 17 ) {
+    drag_enabled = true
     VIEW.nodes.call(VIEW.drag)
     svg.classed('ctrl', false)
   }
