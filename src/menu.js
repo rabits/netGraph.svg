@@ -19,7 +19,7 @@ var Menu = function(options) {
       .attr('class', 'menu')
       .attr('transform', `translate(${e.pageX},${e.pageY})`)
 
-    e.t = target
+    e.t = target || menu_svg
     e.cx = e.clientX
     e.cy = e.clientY
 

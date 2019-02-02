@@ -17,8 +17,8 @@
     </g>
   </defs>
   <g id="container">
+    <rect id="bounds"/>
     <g id="links"/>
-    <g id="markers"/>
     <g id="nodes"/>
   </g>
   <script type="text/javascript" xlink:href="https://cdnjs.cloudflare.com/ajax/libs/d3/5.7.0/d3.min.js"></script>

@@ -14,7 +14,7 @@ function download(data, filename, type) {
     window.navigator.msSaveOrOpenBlob(file, filename)
   } else { // Others
     var url = URL.createObjectURL(file)
-    var f = svg.append('svg:foreignObject')
+    var f = SVG.append('svg:foreignObject')
     var a = document.createElementNS('http://www.w3.org/1999/xhtml', 'a')
     a.href = url
     a.download = filename

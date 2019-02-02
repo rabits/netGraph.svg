@@ -14,9 +14,9 @@ svg.ctrl:not(.active) {
 
 path.link {
   fill: none;
-  stroke: #000;
-  stroke-width: 4px;
+  stroke-width: 3px;
   cursor: default;
+  opacity: 0.5
 }
 
 svg:not(.active):not(.ctrl) path.link {
@@ -29,6 +29,7 @@ path.link.selected {
 
 path.link.dragline {
   pointer-events: none;
+  stroke: #aaa;
 }
 
 path.link.hidden {
@@ -40,7 +41,7 @@ path.link.hidden {
   cursor: pointer;
 }
 
-#nodes>g.node.static .bg {
+#nodes>g.node.fixed>circle.bg {
   stroke: #000 !important;
   stroke-width: 2.5px;
 }
@@ -53,6 +54,7 @@ text {
 #nodes>g.node>text.name {
   text-anchor: middle;
   font-weight: bold;
+  text-shadow: 0 0 2px white;
 }
 
 svg>g.menu>g.item:hover>circle {
@@ -60,6 +62,13 @@ svg>g.menu>g.item:hover>circle {
   stroke-width: 2.5px;
 }
 
+#bounds {
+  stroke: gray;
+  stroke-width: 3px;
+  stroke-dasharray: 10,2;
+  fill-opacity: 0.0;
+}
+
 #container.shadow>g>*:not(.marked) {
-  opacity: 0.2
+  opacity: 0.2;
 }

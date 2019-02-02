@@ -11,11 +11,8 @@
 class EngineBase {
   constructor(cfg) {
     this._ = {}
-    this._v = {}
-
-    if( typeof cfg === 'string' )
-      cfg = this.unpackCfgString(cfg)
-
+    if( cfg.string )
+      Object.entries(this.unpackCfgString(cfg.string)).forEach(([k,v]) => { cfg[k] = v })
     this._.id = cfg.id || Math.floor(Math.random() * 8999999999) + 100000000
     this._.name = cfg.name
     this._.description = cfg.description
@@ -30,7 +27,7 @@ class EngineBase {
     const cls_name = str.substring(0, str.indexOf(':'))
     const data = str.substring(str.indexOf(':')+1)
     var cls = Node.NAMESPACE ? Node.NAMESPACE[cls_name] : window[cls_name]
-    return new cls(data)
+    return new cls({string: data})
   }
 
   // Simple deserializer like "<value>" or by rules in the specific class
@@ -43,28 +40,65 @@ class EngineBase {
 
   toString() { this.type + ':' + this.id }
 
-  toJSON() { JSON.stringify({data: this._, view: this._v}) }
+  toJSON() { JSON.stringify({data: this._}) }
 }
 
 // Basic class for nodes
 class Node extends EngineBase {
   constructor(cfg) {
     super(cfg)
-    this._.owner = cfg.owner
-    this._.parent = cfg.parent
+    this.owner = cfg.owner
+    this.parent = cfg.parent
+    this.color = cfg.color
+    this.pos = [cfg.x || Math.random()*1920, cfg.y || Math.random()*1080]
+    this.fixed = cfg.fixed
 
     this._.childrens = []
     this.addChildrens(cfg.childrens)
-
-    this._.showChildrens = cfg.showChildrens || false
-    this.setShowChildrens(this._.showChildrens)
+    this._.showChildrens = false
+    this.showChildrens = cfg.showChildrens || false
   }
 
   get owner() { return this._.owner }
-  setOwner(val) { this._.owner = val }
+  set owner(val) { this._.owner = val }
+
   get parent() { return this._.parent || this.owner }
+  set parent(val) { this._.parent = val }
+
+  get color() { return this._.color }
+  set color(val) { this._.color = val || Node.COLORS(this.id) }
+
+  get fixed() { return this._fixed }
+  set fixed(val) {
+    this._fixed = val || false
+    if( val ) {
+      this.fx = this.x
+      this.fy = this.y
+    } else
+      this.fx = this.fy = null
+  }
+
+  get pos() { return [this.x, this.y] }
+  set pos(list) { this.x = list[0]; this.y = list[1] }
+
   get childrens() { return this._.childrens }
   get showChildrens() { return this._.showChildrens }
+
+  set showChildrens(show) {
+    if( show === this.showChildrens || this.childrens.length < 1 ) return
+
+    this._.showChildrens = show
+    if( show ) {
+      this._.childrens.forEach( c => { c.pos = this.pos } )
+      DATA.nodes = DATA.nodes.concat(this._.childrens.filter( n => !DATA.nodes.includes(n) ))
+      this._.childrens.forEach( c => createLink(RelationLink, this, c) )
+      markConnectedNode(this)
+    } else {
+      this._.childrens.forEach( c => { c.showChildrens = false } )
+      DATA.links = DATA.links.filter( l => ! (l instanceof RelationLink && l.source === this) )
+      DATA.nodes = DATA.nodes.filter( n => !this._.childrens.includes(n) )
+    }
+  }
 
   addChildrens(childs, type = null) {
     if( ! childs ) return
@@ -78,25 +112,14 @@ class Node extends EngineBase {
       if( ! (c instanceof Node) )
         throw new Error('Unable to add non-Node child ' + c)
       this._.childrens.push(c)
-      c.setOwner(this)
+      c.owner = this
     }
     return this
   }
-
-  setShowChildrens(show = !this._.showChildrens) {
-    if( show === this._.showChildrens ) return
-
-    this._.showChildrens = show
-    if( show ) {
-      DATA.nodes = DATA.nodes.concat(this._.childrens.filter( n => !DATA.nodes.includes(n) ))
-      this._.childrens.forEach( c => createLink(RelationLink, this, c) )
-    } else {
-      this._.childrens.forEach( c => { c.setShowChildrens(false)} )
-      DATA.links = DATA.links.filter( l => ! (l instanceof RelationLink && l.source === this) )
-      DATA.nodes = DATA.nodes.filter( n => !this._.childrens.includes(n) )
-    }
-  }
 }
+
+// Static field to generate new colors
+Node.COLORS = d3.scaleOrdinal(d3.schemeCategory10)
 
 class Group extends Node {
   constructor(cfg) {
@@ -131,15 +154,24 @@ class Link extends EngineBase {
     this._.connector = cfg.connector
     this._.source = cfg.source
     this._.target = cfg.target
+    this._.color = cfg.color || 'gray'
     this.right = true // TODO
   }
 
   get connector() { return this._.owner }
   get source() { return this._.source }
   get target() { return this._.target }
+  get color() { return this._.color }
 }
 
 class RelationLink extends Link {
+  constructor(cfg) {
+    super(cfg)
+    this._.color = cfg.color || this.source.color
+  }
+}
+
+class GroupLink extends Link {
   constructor(cfg) {
     super(cfg)
   }
