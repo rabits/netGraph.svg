@@ -1,5 +1,5 @@
 svg {
-  background-color: #FFF;
+  background-color: #fff;
   cursor: default;
   -webkit-user-select: none;
   -moz-user-select: none;
@@ -54,7 +54,7 @@ text {
 #nodes>g.node>text.name {
   text-anchor: middle;
   font-weight: bold;
-  text-shadow: 0 0 2px white;
+  text-shadow: -1px 0 #fff, 0 1px #fff, 1px 0 #fff, 0 -1px #fff;
 }
 
 svg>g.menu>g.item:hover>circle {
@@ -70,5 +70,5 @@ svg>g.menu>g.item:hover>circle {
 }
 
 #container.shadow>g>*:not(.marked) {
-  opacity: 0.2;
+  opacity: 0.1;
 }

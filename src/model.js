@@ -22,6 +22,7 @@ class EngineBase {
   get type() { return this.constructor.name }
   get name() { return this._.name || this.id }
   get description() { return this._.description }
+  get cfg() { return this._ }
 
   fromString(str) {
     const cls_name = str.substring(0, str.indexOf(':'))
@@ -105,7 +106,7 @@ class Node extends EngineBase {
     if( ! (childs instanceof Array) )
       childs = [childs]
     if( type )
-      childs = childs.map(s => 'Tag:'+s)
+      childs = childs.map(s => type+':'+s)
     for( let c of childs ) {
       if( typeof c === 'string' )
         c = this.fromString(c)
@@ -121,6 +122,15 @@ class Node extends EngineBase {
 // Static field to generate new colors
 Node.COLORS = d3.scaleOrdinal(d3.schemeCategory10)
 
+// Static function to find visible owner
+
+Node.findVisibleOwner = function(node) {
+  let out = node
+  while( ! DATA.nodes.includes(out) )
+    out = out.owner
+  return out
+}
+
 class Group extends Node {
   constructor(cfg) {
     super(cfg)
@@ -131,12 +141,17 @@ class Group extends Node {
 class Connector extends EngineBase {
   constructor(cfg) {
     super(cfg)
-    this._.sourceSelector = cfg.sourceSelector
-    this._.targetSelector = cfg.targetSelector
+    this._.sourceSelector = this._processSelector(cfg.sourceSelector)
+    this._.targetSelector = this._processSelector(cfg.targetSelector)
     this._.targetResource = cfg.targetResource
     this._.owner = cfg.owner
     this._.approved = cfg.approved
     this._.active = cfg.active
+
+    this.targets = []
+    this.sources = []
+    this.links = []
+    this.updateLinks()
   }
 
   get sourceSelector() { return this._.sourceSelector }
@@ -145,35 +160,145 @@ class Connector extends EngineBase {
   get owner() { return this._.owner }
   get approved() { return this._.approved }
   get active() { return this._.active }
+
+  updateLinks() {
+    // Checking the nodes tree
+    for( const n of DATA.nodes ) {
+      // We should process only root nodes without owners
+      if( ! n.owner ) {
+        const res = this._checkNodeAndChildrens(n)
+        this.sources = this.sources.concat(res.sources)
+        this.targets = this.targets.concat(res.targets)
+      }
+    }
+    //console.log('Connector:', this.description)
+
+    // Creating links for the visible nodes
+    let vis_srcs = new Set(this.sources.map(Node.findVisibleOwner))
+    let vis_tgts = new Set(this.targets.map(Node.findVisibleOwner))
+
+    vis_srcs.forEach( src => {
+      vis_tgts.forEach( tgt => {
+        let link = DATA.links.filter(l => [src, tgt].includes(l.source) && [src, tgt].includes(l.target))[0]
+        if( !link )
+          DATA.links.push(new SimpleLink({ source: src, target: tgt }))
+        //console.log('Create link:', src, tgt)
+      })
+    })
+  }
+
+  _processSelector(selector) {
+    if( typeof selector === 'string')
+      selector = [selector]
+    if( selector instanceof Array ) {
+      selector = selector.reduce( (r,s) => {
+        const prop = s.substring(0, s.indexOf(':'))
+        const value = s.substring(s.indexOf(':')+1)
+        if( r.hasOwnProperty(prop) )
+          r[prop].push(value)
+        else
+          r[prop] = [value]
+        return r
+      }, {} )
+    } else if( !( selector instanceof Object ) )
+      throw new Error('Not a proper selector ' + selector)
+
+    return selector
+  }
+
+  /*
+   * Validating selectors and the node tree to generate required links.
+   *
+   * Properties are collected and leafs will include all the special
+   * parent properties. It will allow you to find some special node that
+   * are existing in the same branch with some different object.
+   *
+   * Rules are simple - same property is OR, different properties is AND
+   */
+  _checkNodeAndChildrens(node, props = {}) {
+    let ret = {
+      sources: [node],
+      targets: [node],
+    }
+
+    // Process node
+    Object.assign(props, node.cfg)
+    for( const prop in this.sourceSelector ) {
+      if( ! this.sourceSelector[prop].includes(props[prop]) ) {
+        ret.sources = []
+        break
+      }
+    }
+    for( const prop in this.targetSelector ) {
+      if( ! this.targetSelector[prop].includes(props[prop]) ) {
+        ret.targets = []
+        break
+      }
+    }
+
+    // Process childrens
+    const ret_childs = node.childrens.map( n => this._checkNodeAndChildrens(n, props) )
+    for( const c of ret_childs ) {
+      ret.sources = ret.sources.concat(c.sources)
+      ret.targets = ret.targets.concat(c.targets)
+    }
+    return ret
+  }
 }
 
 // Basic class for links
 class Link extends EngineBase {
   constructor(cfg) {
     super(cfg)
-    this._.connector = cfg.connector
     this._.source = cfg.source
     this._.target = cfg.target
     this._.color = cfg.color || 'gray'
     this.right = true // TODO
+    this.markerStartId = 'start-arrow'
+    this.markerEndId = 'end-arrow'
   }
 
-  get connector() { return this._.owner }
   get source() { return this._.source }
   get target() { return this._.target }
   get color() { return this._.color }
 }
 
-class RelationLink extends Link {
+class SimpleLink extends Link {
+  constructor(cfg) {
+    super(cfg)
+    this._.connector = cfg.connector
+  }
+
+  get connector() { return this._.connector }
+}
+
+class RelationLink extends SimpleLink {
   constructor(cfg) {
     super(cfg)
     this._.color = cfg.color || this.source.color
+    this.markerStartId = 'start-relation'
+    this.markerEndId = 'end-relation'
   }
 }
 
 class GroupLink extends Link {
   constructor(cfg) {
     super(cfg)
+    this._.connectors = cfg.connectors || []
+    this.markerStartId = 'start-group'
+    this.markerEndId = 'end-group'
+  }
+
+  get connectors() { return this._.connectors }
+  addConnectors(conns) {
+    if( ! (conns instanceof Array) )
+      conns = [conns]
+    for( let c of conns ) {
+      if( ! (c instanceof Connector) )
+        throw new Error('Unable to add non-Connector' + c)
+      this._.connectors.push(c)
+    }
+    return this
   }
 }
 
@@ -184,7 +309,10 @@ Node.NAMESPACE = Network
 Network.Owner = class Owner extends Node {
   constructor(cfg) {
     super(cfg)
+    this._.email = cfg.email
   }
+
+  get email() { return this._.email }
 }
 
 Network.Project = class Project extends Node {
@@ -202,15 +330,15 @@ Network.Net = class Net extends Node {
 Network.Subnet = class Subnet extends Node {
   constructor(cfg) {
     super(cfg)
-    this._.cidrRange = cfg.cidrRange || '0.0.0.0/0'
+    this._.cidr = cfg.cidr || '0.0.0.0/0'
   }
 
-  get cidrRange() { return this._.cidrRange }
+  get cidr() { return this._.cidr }
 
   unpackCfgString(str) {
     return {
       name: str,
-      cidrRange: str,
+      cidr: str,
       description: 'Autogenerated',
     }
   }
@@ -253,5 +381,16 @@ Network.Service = class Service extends Node {
 Network.Tag = class Tag extends Node {
   constructor(cfg) {
     super(cfg)
+    this._.tag = cfg.tag
+  }
+
+  get tag() { return this._.tag }
+
+  unpackCfgString(str) {
+    return {
+      name: str,
+      tag: str,
+      description: 'Autogenerated',
+    }
   }
 }

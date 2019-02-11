@@ -125,7 +125,7 @@ const VIEW = {
   links: container.select('#links').selectAll('path'),
   // Force field
   force: d3.forceSimulation()
-    .force('link', d3.forceLink().id(d => d.id).distance(50).strength(0.1))
+    .force('link', d3.forceLink().id(d => d.id).distance(50).strength(d => d.type === 'RelationLink' ? 0.1 : 0.0))
     .force('charge', d3.forceManyBody().strength(-100))
     .force('x', d3.forceX(SVG.width / 2).strength(0.01))
     .force('y', d3.forceY(SVG.height / 2).strength(0.01))
@@ -260,9 +260,13 @@ function restart() {
       if( mouseupNode === mousedownNode )
         return resetMouseVars()
 
-      selectedLink = createLink(Link, mousedownNode, mouseupNode)
+      selectedLink = createLink(SimpleLink, mousedownNode, mouseupNode)
       selectedNode = null
 
+      restart()
+    })
+    .on('dblclick', d => {
+      d.showChildrens = !d.showChildrens
       restart()
     })
 
@@ -295,8 +299,8 @@ function restart() {
   VIEW.links
     .classed('selected', d => d === selectedLink)
     .classed('marked', d => d.marked)
-    .style('marker-start', d => d.left ? 'url(#start-arrow)' : '')
-    .style('marker-end', d => d.right ? 'url(#end-arrow)' : '')
+    .style('marker-start', d => d.left ? `url(#${d.markerStartId})` : '')
+    .style('marker-end', d => d.right ? `url(#${d.markerEndId})` : '')
 
   // remove old links
   VIEW.links.exit().remove()
@@ -457,7 +461,7 @@ function createNode(point) {
 /**
  * Create link and add to graph (if not exists)
  * Types:
- *   - Link - just a link between two nodes
+ *   - SimpleLink - just a link between two nodes
  *   - RelativeLink - parent-child relations
  *   - GroupLink - link contains multiple links
  */
