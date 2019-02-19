@@ -11,6 +11,7 @@
 const SVG = d3.select('svg')
 const container = SVG.select('#container')
 const bounds = container.select('#bounds')
+const connectors_list = SVG.select('#connectors').append('xhtml:div')
 
 let drag_enabled = true
 
@@ -120,9 +121,16 @@ new MutationObserver(function(mutationsList) {
   }
 }).observe(container.node(), { attributes: false, childList: true, subtree: true })
 
+var DATA = {
+  nodes: [],
+  connectors: [],
+  links: [],
+}
+
 const VIEW = {
   nodes: container.select('#nodes').selectAll('g'),
   links: container.select('#links').selectAll('path'),
+  connectors: connectors_list.selectAll('div'),
   // Force field
   force: d3.forceSimulation()
     .force('link', d3.forceLink().id(d => d.id).distance(50).strength(d => d.type === 'RelationLink' ? 0.1 : 0.0))
@@ -169,7 +177,7 @@ function resetMouseVars() {
 
 // update force layout (called automatically each iteration)
 function tick() {
-  VIEW.nodes.attr('transform', d => `translate(${d.x},${d.y})`)
+  VIEW.nodes.attr('transform', d => `translate(${Math.round(d.x)},${Math.round(d.y)})`)
 
   // draw directed edges with proper padding from node centers
   VIEW.links.attr('d', d => {
@@ -180,19 +188,98 @@ function tick() {
     const normY = deltaY / dist
     const sourcePadding = d.left ? 17 : 12
     const targetPadding = d.right ? 17 : 12
-    const sourceX = d.source.x + (sourcePadding * normX)
-    const sourceY = d.source.y + (sourcePadding * normY)
-    const targetX = d.target.x - (targetPadding * normX)
-    const targetY = d.target.y - (targetPadding * normY)
+    const sourceX = Math.round(d.source.x + (sourcePadding * normX))
+    const sourceY = Math.round(d.source.y + (sourcePadding * normY))
+    const targetX = Math.round(d.target.x - (targetPadding * normX))
+    const targetY = Math.round(d.target.y - (targetPadding * normY))
 
     return `M${sourceX},${sourceY}L${targetX},${targetY}`
   })
 }
 
-// update graph (called when needed)
+// Update connectors list
+function updateConnectorsList() {
+  VIEW.connectors = VIEW.connectors.data(DATA.connectors, d => d.id)
+
+  // Update existing connectors
+  VIEW.connectors
+    .classed('valid', d => d.valid)
+    .classed('active', d => d.active)
+    .classed('approved', d => d.approved)
+    .classed('marked', d => d.marked)
+    .classed('visible', d => d.visible)
+  VIEW.connectors.selectAll('.decription')
+    .text(d => d.description)
+
+  // Remove old connectors
+  VIEW.connectors.exit().remove()
+
+  // Add new connectors
+  const c = VIEW.connectors.enter().append('xhtml:div')
+    .attr('menuType', 'connector')
+    .classed('connector', true)
+    .classed('valid', d => d.valid)
+    .classed('active', d => d.active)
+    .classed('approved', d => d.approved)
+    .classed('marked', d => d.marked)
+    .classed('visible', d => d.visible)
+    .style('background-color', d => d.color)
+
+  c.append('xhtml:div')
+    .classed('active', true)
+    .attr('title', 'Active switch')
+    .on('mousedown', d => {
+      d.active = !d.active
+      updateConnectorsList()
+    })
+  c.append('xhtml:div')
+    .classed('approved', true)
+    .attr('title', 'Approved switch')
+    .on('mousedown', d => {
+      d.approved = !d.approved
+      updateConnectorsList()
+    })
+  c.append('xhtml:div')
+    .classed('valid', true)
+    .attr('title', 'Valid switch')
+    .on('mousedown', d => {
+      d.valid = !d.valid
+      updateConnectorsList()
+    })
+  c.append('xhtml:div')
+    .classed('visible', true)
+    .attr('title', 'Visible switch')
+    .on('mousedown', d => {
+      d.visible = !d.visible
+      updateConnectorsList()
+    })
+  c.append('xhtml:div')
+    .classed('usages', true)
+    .attr('title', 'Number of usages')
+    .text(d => d.targets.length + d.sources.length)
+  c.append('xhtml:span')
+    .classed('description', true)
+    .attr('title', d => d.description)
+    .text(d => d.description)
+
+  VIEW.connectors = c.merge(VIEW.connectors)
+}
+
+// Update graph (called when needed)
 function restart() {
   container.classed('shadow', () => selectedNode || selectedLink)
 
+  updateNodes()
+  updateLinks()
+
+  // set the graph in motion
+  VIEW.force.nodes(DATA.nodes)
+    .force('link').links(DATA.links)
+
+  VIEW.force.alphaTarget(0.3).restart()
+}
+
+function updateNodes() {
   VIEW.nodes = VIEW.nodes.data(DATA.nodes, d => d.id)
 
   // update existing nodes (fixed & selected visual states)
@@ -228,8 +315,8 @@ function restart() {
     .style('stroke', d => d3.rgb(d.color).darker().toString())
     .on('mousedown', d => {
       menu.hide()
-      // select node
-      selectedNode = mousedownNode = d
+
+      mousedownNode = d
       // TODO: d3.select(this).moveToFront()
       selectedLink = null
 
@@ -242,8 +329,11 @@ function restart() {
           .style('marker-end', 'url(#end-arrow)')
           .classed('hidden', false)
           .attr('d', `M${mousedownNode.x},${mousedownNode.y}L${mousedownNode.x},${mousedownNode.y}`)
-      } else
+      } else {
+        // select node
+        selectedNode = mousedownNode
         markConnectedNode(selectedNode)
+      }
 
       restart()
     })
@@ -262,6 +352,7 @@ function restart() {
 
       selectedLink = createLink(SimpleLink, mousedownNode, mouseupNode)
       selectedNode = null
+      markConnectedLink(selectedLink)
 
       restart()
     })
@@ -280,25 +371,17 @@ function restart() {
   if( drag_enabled )
     g.call(VIEW.drag)
 
-  // TODO: node editor
-  /*var f = g.append('svg:foreignObject')
-    .attr('x', 0)
-    .attr('y', -20)
-    .attr('height', 100)
-    .attr('width', 100)
-  if( f.node() ) {
-    f.node().appendChild(document.createElementNS('http://www.w3.org/1999/xhtml', 'input'))
-    f.select('div').text('lool')
-  }*/
-
   VIEW.nodes = g.merge(VIEW.nodes)
+}
 
+function updateLinks() {
   VIEW.links = VIEW.links.data(DATA.links)
 
   // update existing links
   VIEW.links
     .classed('selected', d => d === selectedLink)
     .classed('marked', d => d.marked)
+    .classed('hidden', d => d.hidden)
     .style('marker-start', d => d.left ? `url(#${d.markerStartId})` : '')
     .style('marker-end', d => d.right ? `url(#${d.markerEndId})` : '')
 
@@ -312,6 +395,7 @@ function restart() {
     .attr('class', 'link')
     .classed('selected', d => d === selectedLink)
     .classed('marked', d => d.marked)
+    .classed('hidden', d => d.hidden)
     .style('marker-start', d => d.left ? 'url(#start-arrow)' : '')
     .style('marker-end', d => d.right ? 'url(#end-arrow)' : '')
     .on('contextmenu', function() {
@@ -331,12 +415,6 @@ function restart() {
       restart()
     })
     .merge(VIEW.links)
-
-  // set the graph in motion
-  VIEW.force.nodes(DATA.nodes)
-    .force('link').links(DATA.links)
-
-  VIEW.force.alphaTarget(0.3).restart()
 }
 
 function mousedown() {
@@ -560,7 +638,6 @@ function keyup() {
   }
 }
 
-// app starts here
 SVG.on('mousedown', mousedown)
   .on('mousemove', mousemove)
   .on('mouseup', mouseup)
@@ -568,4 +645,12 @@ SVG.on('mousedown', mousedown)
 d3.select(window)
   .on('keydown', keydown)
   .on('keyup', keyup)
+
+// Load data from local file
+SVG.append('svg:script')
+  .attr('type', 'text/javascript')
+  .on('load', () => { restart(); updateConnectorsList() })
+  .attr('xlink:href', 'data.js')
+
+// App starts here
 restart()

@@ -28,6 +28,9 @@ secondary mouse button on the empty space and you will see the menu items availa
 When you created the graph, relations & connections - you can save it. Right click on the empty
 space and select Save SVG. It will save results of your work.
 
+You can put your node/connector objects into data.js in the root directory and svg will load it
+during startup.
+
 ### Controls
 
 * Right Mouse Button - context menu with actions
