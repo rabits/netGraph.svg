@@ -72,3 +72,54 @@ svg>g.menu>g.item:hover>circle {
 #container.shadow>g>*:not(.marked) {
   opacity: 0.1;
 }
+
+#connectors>div {
+  margin: 10px;
+  height: 98%;
+  overflow-y: auto;
+}
+
+#connectors>div>.connector {
+  height: 1.5em;
+  border-radius: 4px;
+}
+#connectors>div>.connector * {
+  font-size: 0.8em;
+  display: block;
+  margin-left: 5px;
+  margin-top: 4px;
+}
+#connectors>div>.connector>div {
+  border: 1px solid #000;
+  border-radius: 4px;
+  float: left;
+  padding: 6px;
+}
+#connectors>div>.connector>.usages {
+  float: left;
+  background-color: #ddd;
+  padding: 2px;
+  margin-top: 1px;
+  float: right;
+}
+#connectors>div>.connector.active>.active {
+  background-color: #000;
+}
+#connectors>div>.connector.valid>.valid {
+  background-color: #000;
+}
+#connectors>div>.connector.approved>.approved {
+  background-color: #000;
+}
+#connectors>div>.connector.visible>.visible {
+  background-color: #000;
+}
+/*#connectors>div>.connector.enabled {
+  background-color: #000;
+}*/
+#connectors>div>.connector .description {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding: 4px;
+}

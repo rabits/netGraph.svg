@@ -16,6 +16,9 @@ class EngineBase {
     this._.id = cfg.id || Math.floor(Math.random() * 8999999999) + 100000000
     this._.name = cfg.name
     this._.description = cfg.description
+
+    this.color = cfg.color
+    this.visible = true
   }
 
   get id() { return this._.id }
@@ -23,6 +26,9 @@ class EngineBase {
   get name() { return this._.name || this.id }
   get description() { return this._.description }
   get cfg() { return this._ }
+
+  get color() { return this._.color }
+  set color(val) { this._.color = val || EngineBase.COLORS(this.id) }
 
   fromString(str) {
     const cls_name = str.substring(0, str.indexOf(':'))
@@ -44,15 +50,20 @@ class EngineBase {
   toJSON() { JSON.stringify({data: this._}) }
 }
 
+// Static field to generate new colors
+EngineBase.COLORS = d3.scaleOrdinal(d3.schemeCategory10)
+
+
 // Basic class for nodes
 class Node extends EngineBase {
   constructor(cfg) {
     super(cfg)
     this.owner = cfg.owner
     this.parent = cfg.parent
-    this.color = cfg.color
     this.pos = [cfg.x || Math.random()*1920, cfg.y || Math.random()*1080]
     this.fixed = cfg.fixed
+
+    this.connectors = new Set() // Managed by connectors related to the node
 
     this._.childrens = []
     this.addChildrens(cfg.childrens)
@@ -66,9 +77,6 @@ class Node extends EngineBase {
   get parent() { return this._.parent || this.owner }
   set parent(val) { this._.parent = val }
 
-  get color() { return this._.color }
-  set color(val) { this._.color = val || Node.COLORS(this.id) }
-
   get fixed() { return this._fixed }
   set fixed(val) {
     this._fixed = val || false
@@ -81,6 +89,8 @@ class Node extends EngineBase {
 
   get pos() { return [this.x, this.y] }
   set pos(list) { this.x = list[0]; this.y = list[1] }
+
+  updateConnectors() { this.connectors.forEach(c => c.update(this)) }
 
   get childrens() { return this._.childrens }
   get showChildrens() { return this._.showChildrens }
@@ -98,7 +108,9 @@ class Node extends EngineBase {
       this._.childrens.forEach( c => { c.showChildrens = false } )
       DATA.links = DATA.links.filter( l => ! (l instanceof RelationLink && l.source === this) )
       DATA.nodes = DATA.nodes.filter( n => !this._.childrens.includes(n) )
+      this._.childrens.forEach( c => { c.updateConnectors() } )
     }
+    this.updateConnectors()
   }
 
   addChildrens(childs, type = null) {
@@ -119,11 +131,7 @@ class Node extends EngineBase {
   }
 }
 
-// Static field to generate new colors
-Node.COLORS = d3.scaleOrdinal(d3.schemeCategory10)
-
 // Static function to find visible owner
-
 Node.findVisibleOwner = function(node) {
   let out = node
   while( ! DATA.nodes.includes(out) )
@@ -141,25 +149,56 @@ class Group extends Node {
 class Connector extends EngineBase {
   constructor(cfg) {
     super(cfg)
+    this.targets = []
+    this.sources = []
+    this.links = []
+
     this._.sourceSelector = this._processSelector(cfg.sourceSelector)
     this._.targetSelector = this._processSelector(cfg.targetSelector)
     this._.targetResource = cfg.targetResource
     this._.owner = cfg.owner
-    this._.approved = cfg.approved
-    this._.active = cfg.active
+    this.approved = cfg.approved
+    this.active = cfg.active
+    this.valid = cfg.valid
 
-    this.targets = []
-    this.sources = []
-    this.links = []
-    this.updateLinks()
+    this.update()
   }
 
   get sourceSelector() { return this._.sourceSelector }
   get targetSelector() { return this._.targetSelector }
   get targetResource() { return this._.targetResource }
   get owner() { return this._.owner }
+
   get approved() { return this._.approved }
+  set approved(val) { this._.approved = val === undefined ? true : val }
+
   get active() { return this._.active }
+  set active(val) { this._.active = val === undefined ? true : val }
+
+  get valid() { return this._.valid }
+  set valid(val) { this._.valid = val === undefined ? true : val }
+
+  get visible() { return this._visible }
+  set visible(val) {
+    this._visible = val
+    if( this.links )
+      this.links.forEach( d => d.hidden = !val )
+    updateLinks()
+  }
+
+  update(node) {
+    this.cleanLinks(node)
+    this.updateLinks()
+  }
+
+  cleanLinks(node) {
+    const to_remove = node ? this.links.filter(l => l.source === node || l.target === node) : this.links
+
+    for( const l of to_remove ) {
+      DATA.links.splice(DATA.links.indexOf(l), 1)
+      this.links.splice(this.links.indexOf(l), 1)
+    }
+  }
 
   updateLinks() {
     // Checking the nodes tree
@@ -171,18 +210,23 @@ class Connector extends EngineBase {
         this.targets = this.targets.concat(res.targets)
       }
     }
-    //console.log('Connector:', this.description)
 
     // Creating links for the visible nodes
     let vis_srcs = new Set(this.sources.map(Node.findVisibleOwner))
     let vis_tgts = new Set(this.targets.map(Node.findVisibleOwner))
 
-    vis_srcs.forEach( src => {
-      vis_tgts.forEach( tgt => {
-        let link = DATA.links.filter(l => [src, tgt].includes(l.source) && [src, tgt].includes(l.target))[0]
-        if( !link )
-          DATA.links.push(new SimpleLink({ source: src, target: tgt }))
-        //console.log('Create link:', src, tgt)
+    vis_srcs.forEach( source => {
+      source.connectors.add(this)
+      vis_tgts.forEach( target => {
+        target.connectors.add(this)
+        if( source === target ) return
+        let link = DATA.links.filter(l => [source, target].includes(l.source) && [source, target].includes(l.target))[0]
+        if( !link ) {
+          link = new SimpleLink({ source, target })
+          link.hidden = !this.visible
+          DATA.links.push(link)
+          this.links.push(link)
+        }
       })
     })
   }
@@ -252,7 +296,7 @@ class Link extends EngineBase {
     super(cfg)
     this._.source = cfg.source
     this._.target = cfg.target
-    this._.color = cfg.color || 'gray'
+    this.color = cfg.color || 'gray'
     this.right = true // TODO
     this.markerStartId = 'start-arrow'
     this.markerEndId = 'end-arrow'
@@ -260,7 +304,6 @@ class Link extends EngineBase {
 
   get source() { return this._.source }
   get target() { return this._.target }
-  get color() { return this._.color }
 }
 
 class SimpleLink extends Link {
@@ -275,7 +318,7 @@ class SimpleLink extends Link {
 class RelationLink extends SimpleLink {
   constructor(cfg) {
     super(cfg)
-    this._.color = cfg.color || this.source.color
+    this.color = cfg.color || this.source.color
     this.markerStartId = 'start-relation'
     this.markerEndId = 'end-relation'
   }
