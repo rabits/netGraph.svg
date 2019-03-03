@@ -86,13 +86,6 @@ document.addEventListener('mousedown', function() {
   menu.hide()
 })
 
-// TODO: bring selected object to front
-/*d3.selection.prototype.moveToFront = function() {
-  return this.each(function() {
-    this.parentNode.appendChild(this);
-  });
-};*/
-
 // Set document size to window size at the first time
 if( ! SVG.attr('width') || !SVG.attr('height') ) {
   updateDocumentRect({top: 0, left: 0, bottom: window.innerHeight, right: window.innerWidth})
@@ -317,7 +310,8 @@ function updateNodes() {
       menu.hide()
 
       mousedownNode = d
-      // TODO: d3.select(this).moveToFront()
+      moveToFront(d3.event.target.parentNode)
+
       selectedLink = null
 
       if( d3.event.button > 0 )
@@ -427,6 +421,10 @@ function mousedown() {
   if( d3.event.buttons === 1 && d3.event.ctrlKey )
     createNode(d3.mouse(this))
   restart()
+}
+
+function moveToFront(node) {
+  node.parentNode.appendChild(node)
 }
 
 function mousemove() {
