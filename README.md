@@ -17,8 +17,8 @@ Available actions:
 ## Getting Started
 
 Check how the project is working right here:
-* Latest good bundle build [netGraph.svg](https://circleci.com/api/v1.1/project/github/rabits/netGraph.svg/latest/artifacts/0/home/circleci/netGraph.svg/out/netGraph.svg?branch=master&filter=successful)
 * Current master multifile [main.svg](https://rabits.github.io/netGraph.svg/main.svg)
+* Latest good bundle build [netGraph.svg](https://circleci.com/api/v1.1/project/github/rabits/netGraph.svg/latest/artifacts/0/home/circleci/netGraph.svg/out/netGraph.svg?branch=master&filter=successful)
 
 The netGraph.svg could work as is - just open the main.svg from the repository in your browser.
 

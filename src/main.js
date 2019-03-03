@@ -650,6 +650,13 @@ d3.select(window)
 SVG.append('svg:script')
   .attr('type', 'text/javascript')
   .on('load', () => { restart(); updateConnectorsList() })
+  .on('error', () => {
+    // If data is not existing - load sample data
+    SVG.append('svg:script')
+      .attr('type', 'text/javascript')
+      .on('load', () => { restart(); updateConnectorsList() })
+      .attr('xlink:href', 'data.sample.js')
+  })
   .attr('xlink:href', 'data.js')
 
 // App starts here
